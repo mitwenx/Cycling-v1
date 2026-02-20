@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+sqlmodel
+websockets
+python-multipart
+# python-multipart is required for the new GPX File Upload feature
