@@ -5,13 +5,11 @@ import L from 'leaflet';
 import { ArrowLeft, Undo2, Save, Route as RouteIcon } from 'lucide-react';
 import { saveRoute } from '../api';
 
-// Custom Map Marker for waypoints
 const waypointIcon = L.divIcon({
     html: `<div class="w-4 h-4 bg-white border-4 border-primary rounded-full shadow-md"></div>`,
     className: ''
 });
 
-// Component to handle map clicks
 function ClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
     useMapEvents({
         click(e) {
@@ -23,12 +21,11 @@ function ClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) =
 
 export default function Planner() {
     const nav = useNavigate();
-    const = useState<[]>([]);
-    const = useState<[]>([]);
-    const = useState({ distance: 0, elevation: 0 });
-    const = useState(false);
+    const [waypoints, setWaypoints] = useState<any[]>([]);
+    const [snappedPath, setSnappedPath] = useState<any[]>([]);
+    const [stats, setStats] = useState({ distance: 0, elevation: 0 });
+    const [loading, setLoading] = useState(false);
 
-    // Fetch the route from OSRM whenever waypoints change
     useEffect(() => {
         const fetchRoute = async () => {
             if (waypoints.length < 2) {
@@ -39,22 +36,18 @@ export default function Planner() {
 
             setLoading(true);
             try {
-                // OSRM requires format: lon,lat;lon,lat
-                const coordString = waypoints.map(p => `${p},${p}`).join(';');
+                const coordString = waypoints.map(p => `${p[1]},${p[0]}`).join(';');
                 const url = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${coordString}?overview=full&geometries=geojson`;
 
                 const res = await fetch(url);
                 const data = await res.json();
 
                 if (data.routes && data.routes.length > 0) {
-                    const route = data.routes;
-                    // OSRM returns, Leaflet needs
-                    const geometry = route.geometry.coordinates.map((c: any) =>, c]);
+                    const route = data.routes[0];
+                    const geometry = route.geometry.coordinates.map((c: any) => [c[1], c[0]]);
                     setSnappedPath(geometry);
                     
                     const distKm = route.distance / 1000;
-                    
-                    // Fetch Elevation Sample (Open-Meteo)
                     const elev = await fetchElevation(geometry);
                     setStats({ distance: distKm, elevation: elev });
                 }
@@ -66,17 +59,16 @@ export default function Planner() {
         };
 
         fetchRoute();
-    },);
+    }, [waypoints]);
 
-    const fetchElevation = async (path:[]) => {
+    const fetchElevation = async (path: any[]) => {
         if (path.length < 2) return 0;
-        // Sample roughly 50 points to stay within URL limits
         const step = Math.ceil(path.length / 50);
         const sampled = path.filter((_, i) => i % step === 0);
-        if (sampled !== path) sampled.push(path);
+        if (sampled[sampled.length - 1] !== path[path.length - 1]) sampled.push(path[path.length - 1]);
 
-        const lats = sampled.map(p => p).join(',');
-        const lons = sampled.map(p => p).join(',');
+        const lats = sampled.map(p => p[0]).join(',');
+        const lons = sampled.map(p => p[1]).join(',');
 
         try {
             const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lons}`);
@@ -85,17 +77,17 @@ export default function Planner() {
 
             let gain = 0;
             for (let i = 1; i < data.elevation.length; i++) {
-                const diff = data.elevation - data.elevation;
+                const diff = data.elevation[i] - data.elevation[i - 1];
                 if (diff > 0) gain += diff;
             }
-            return Math.round(gain * 1.1); // Add 10% to account for missed micro-hills during sampling
+            return Math.round(gain * 1.1);
         } catch {
             return 0;
         }
     };
 
     const handleMapClick = (lat: number, lng: number) => {
-        setWaypoints(prev =>]);
+        setWaypoints(prev => [...prev, [lat, lng]]);
     };
 
     const undoLast = () => {
@@ -116,7 +108,7 @@ export default function Planner() {
                 points: snappedPath
             });
             alert("Route saved!");
-            nav('/settings'); // Send user back to settings after saving
+            nav('/settings');
         } catch (e) {
             alert("Failed to save route.");
         } finally {
@@ -126,7 +118,6 @@ export default function Planner() {
 
     return (
         <div className="h-screen flex flex-col bg-background">
-            {/* Header */}
             <div className="p-4 flex justify-between items-center bg-background z-10 relative">
                 <button onClick={() => nav(-1)} className="p-2 bg-surface rounded-full text-white">
                     <ArrowLeft size={20} />
@@ -139,7 +130,6 @@ export default function Planner() {
                 </button>
             </div>
 
-            {/* Live Stats Overlay */}
             <div className="px-4 pb-4 bg-background z-10 relative">
                 <div className="bg-surface p-4 rounded-3xl flex justify-around shadow-lg">
                     <div className="text-center">
@@ -154,37 +144,33 @@ export default function Planner() {
                 </div>
             </div>
 
-            {/* Map Area */}
             <div className="flex-1 relative z-0 pb-20 rounded-t-3xl overflow-hidden border-t border-gray-800">
                 {loading && (
-                    <div className="absolute inset-0 bg-black/40 z- flex items-center justify-center backdrop-blur-sm">
+                    <div className="absolute inset-0 bg-black/40 z-20 flex items-center justify-center backdrop-blur-sm">
                         <div className="bg-surface px-6 py-3 rounded-2xl font-bold animate-pulse">Calculating Route...</div>
                     </div>
                 )}
                 
-                <MapContainer center={} zoom={13} zoomControl={false} style={{ height: '100%', width: '100%' }}>
+                <MapContainer center={[0,0]} zoom={2} zoomControl={false} style={{ height: '100%', width: '100%' }}>
                     <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
                     <ClickHandler onMapClick={handleMapClick} />
                     
-                    {/* Draw points */}
                     {waypoints.map((pos, idx) => (
                         <Marker key={idx} position={pos} icon={waypointIcon} />
                     ))}
                     
-                    {/* Draw Path */}
                     <Polyline positions={snappedPath} color="#a8c7fa" weight={5} opacity={0.8} />
                 </MapContainer>
 
-                {/* Undo Button */}
                 <button 
                     onClick={undoLast}
                     disabled={waypoints.length === 0}
-                    className="absolute bottom-28 right-4 z- p-4 bg-surface text-white rounded-full shadow-lg border border-gray-700 disabled:opacity-50 active:scale-95"
+                    className="absolute bottom-28 right-4 z-10 p-4 bg-surface text-white rounded-full shadow-lg border border-gray-700 disabled:opacity-50 active:scale-95"
                 >
                     <Undo2 size={24} />
                 </button>
                 
-                <div className="absolute top-4 left-0 right-0 text-center z- pointer-events-none">
+                <div className="absolute top-4 left-0 right-0 text-center z-10 pointer-events-none">
                     <span className="bg-black/60 text-white text-xs px-4 py-2 rounded-full backdrop-blur-md">
                         Tap map to add waypoints
                     </span>
