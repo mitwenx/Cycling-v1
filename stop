@@ -1,0 +1,27 @@
+#!/bin/bash
+
+APP_NAME=$1
+
+if; then
+    echo "Usage: ./stop mii"
+    exit 1
+fi
+
+if; then
+    echo "miii is not currently running (no .mii.pid file found)."
+    exit 1
+fi
+
+PID=$(cat .mii.pid)
+echo ">>> Stopping miii safely (PID: $PID)..."
+
+# Gracefully kill the uvicorn process
+kill -15 $PID 2>/dev/null
+
+# Wait a moment to ensure databases save properly
+sleep 2
+
+# Clean up the PID file
+rm -f .mii.pid
+
+echo "miii has been stopped."
