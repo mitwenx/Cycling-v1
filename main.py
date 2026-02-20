@@ -1,15 +1,18 @@
 import os
+import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, UploadFile, File, BackgroundTasks
+from datetime import datetime
+
+from fastapi import FastAPI, WebSocket, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlmodel import SQLModel, create_engine, Session, select
-import asyncio
-from datetime import datetime
 
-from backend.models import Ride, TrackPoint, BestEffort, SavedRoute
+# Backend Imports
+from backend.models import Ride, TrackPoint, BestEffort
 from backend.gps_manager import GPSManager
 from backend.gpx_parser import import_gpx
+from backend.physics import calculate_calories
 
 # Database Setup
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -17,17 +20,20 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 engine = create_engine(f"sqlite:///{DATA_DIR}/cycling.db")
 
+# Initialize GPS Manager
 gps_manager = GPSManager(engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Create DB tables if they don't exist
     SQLModel.metadata.create_all(engine)
+    # Start the GPS loop in the background
     asyncio.create_task(gps_manager.loop())
     yield
 
 app = FastAPI(lifespan=lifespan)
 
-# Mount React App
+# Mount React App (Frontend)
 if os.path.exists("frontend/dist"):
     app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
 
@@ -37,7 +43,8 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     gps_manager.connections.append(websocket)
     try:
-        while True: await websocket.receive_text()
+        while True:
+            await websocket.receive_text()
     except:
         if websocket in gps_manager.connections:
             gps_manager.connections.remove(websocket)
@@ -53,22 +60,27 @@ def control_ride(action: str):
             gps_manager.current_ride_id = ride.id
             gps_manager.is_recording = True
             gps_manager.is_paused = False
-            gps_manager.point_buffer =[]
+            gps_manager.point_buffer = []
+            
     elif action == "pause":
         gps_manager.is_paused = True
+        
     elif action == "resume":
         gps_manager.is_paused = False
+        
     elif action == "stop":
         gps_manager.flush_buffer()
         gps_manager.is_recording = False
         with Session(engine) as session:
-            ride = session.get(Ride, gps_manager.current_ride_id)
-            if ride:
-                ride.end_time = datetime.now()
-                from backend.physics import calculate_calories
-                ride.calories = calculate_calories(ride.avg_power_watts, ride.moving_time_seconds)
-                session.commit()
+            if gps_manager.current_ride_id:
+                ride = session.get(Ride, gps_manager.current_ride_id)
+                if ride:
+                    ride.end_time = datetime.now()
+                    ride.calories = calculate_calories(ride.avg_power_watts, ride.moving_time_seconds)
+                    session.add(ride)
+                    session.commit()
         gps_manager.current_ride_id = None
+        
     return {"status": "ok"}
 
 @app.get("/api/history")
@@ -80,10 +92,16 @@ def get_history():
 def get_ride(ride_id: int):
     with Session(engine) as session:
         ride = session.get(Ride, ride_id)
+        if not ride:
+            return {"error": "Ride not found"}
+            
         points = session.exec(select(TrackPoint).where(TrackPoint.ride_id == ride_id).order_by(TrackPoint.timestamp)).all()
         efforts = session.exec(select(BestEffort).where(BestEffort.ride_id == ride_id)).all()
-        # Downsample path for frontend mapping
-        path = [ for i, p in enumerate(points) if i % 3 == 0]
+        
+        # --- FIX WAS APPLIED HERE ---
+        # We now extract [latitude, longitude] for the frontend map path
+        path = [[p.latitude, p.longitude] for i, p in enumerate(points) if i % 3 == 0]
+        
         return {"ride": ride, "path": path, "points": points, "achievements": efforts}
 
 @app.post("/api/import/gpx")
@@ -95,4 +113,7 @@ async def upload_gpx(file: UploadFile = File(...)):
 
 @app.get("/{full_path:path}")
 def serve_react_app(full_path: str):
-    return FileResponse("frontend/dist/index.html")
+    # Serve index.html for any other route to let React Router handle it
+    if os.path.exists("frontend/dist/index.html"):
+        return FileResponse("frontend/dist/index.html")
+    return {"error": "Frontend not built. Please run 'npm run build' in frontend folder."}
