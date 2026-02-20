@@ -2,22 +2,32 @@
 
 APP_NAME=$1
 
-if; then
+if test "$APP_NAME" != "mii"; then
     echo "Usage: ./start mii"
     exit 1
 fi
 
 echo ">>> Checking system dependencies..."
 
-# 1. Install System Packages if missing (First Time Setup)
-if ! command -v python &> /dev/null || ! command -v npm &> /dev/null || ! command -v termux-location &> /dev/null; then
+MISSING_DEPS=0
+if ! command -v python >/dev/null 2>&1; then MISSING_DEPS=1; fi
+if ! command -v npm >/dev/null 2>&1; then MISSING_DEPS=1; fi
+if ! command -v termux-location >/dev/null 2>&1; then MISSING_DEPS=1; fi
+
+# 1. Install System Packages
+if test $MISSING_DEPS -eq 1; then
     echo ">>> First time setup: Installing system packages (Python, Node.js, Termux-API)..."
     pkg update -y
     pkg install python nodejs termux-api -y
+    echo ""
+    echo "⚠️ IMPORTANT: Make sure you ALSO installed the 'Termux:API' app from F-Droid!"
+    echo "⚠️ Make sure you gave it 'Location' permissions in your Android settings."
+    echo ""
+    sleep 3
 fi
 
-# 2. Setup Python Virtual Environment (First Time Setup)
-if; then
+# 2. Setup Python Virtual Environment
+if test ! -d "venv"; then
     echo ">>> First time setup: Creating Python virtual environment..."
     python -m venv venv
     source venv/bin/activate
@@ -27,8 +37,8 @@ else
     source venv/bin/activate
 fi
 
-# 3. Build React Frontend (First Time Setup)
-if; then
+# 3. Build React Frontend
+if test ! -d "frontend/dist"; then
     echo ">>> First time setup: Building the React Frontend..."
     cd frontend
     npm install
@@ -37,22 +47,23 @@ if; then
 fi
 
 # 4. Prevent double-starting
-if; then
-    if ps -p $(cat .mii.pid) > /dev/null 2>&1; then
-        echo "miii is already running! (PID: $(cat .mii.pid))"
+if test -f ".mii.pid"; then
+    OLD_PID=$(cat .mii.pid)
+    if ps -p $OLD_PID > /dev/null 2>&1; then
+        echo "miii is already running! (PID: $OLD_PID)"
         echo "To stop it, run: ./stop mii"
         exit 1
     else
         # Process died but PID file remains, clean it up
-        rm .mii.pid
+        rm -f .mii.pid
     fi
 fi
 
 # 5. Start the App in the background
 echo ">>> Starting miii background service..."
 nohup uvicorn main:app --host 0.0.0.0 --port 8000 > miii.log 2>&1 &
-PID=$!
-echo $PID > .mii.pid
+NEW_PID=$!
+echo $NEW_PID > .mii.pid
 
 # 6. Success Output
 echo "====================================================="
