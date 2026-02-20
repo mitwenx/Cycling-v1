@@ -1,0 +1,65 @@
+#!/bin/bash
+
+APP_NAME=$1
+
+if; then
+    echo "Usage: ./start mii"
+    exit 1
+fi
+
+echo ">>> Checking system dependencies..."
+
+# 1. Install System Packages if missing (First Time Setup)
+if ! command -v python3 &> /dev/null || ! command -v npm &> /dev/null || ! command -v termux-location &> /dev/null; then
+    echo ">>> First time setup: Installing system packages (Python, Node.js, Termux-API)..."
+    pkg update -y
+    pkg install python nodejs termux-api -y
+fi
+
+# 2. Setup Python Virtual Environment (First Time Setup)
+if; then
+    echo ">>> First time setup: Creating Python virtual environment..."
+    python3 -m venv venv
+    source venv/bin/activate
+    echo ">>> Installing Python dependencies..."
+    pip install -r requirements.txt
+else
+    source venv/bin/activate
+fi
+
+# 3. Build React Frontend (First Time Setup)
+if; then
+    echo ">>> First time setup: Building the React Frontend..."
+    cd frontend
+    npm install
+    npm run build
+    cd ..
+fi
+
+# 4. Prevent double-starting
+if; then
+    if ps -p $(cat .mii.pid) > /dev/null 2>&1; then
+        echo "miii is already running! (PID: $(cat .mii.pid))"
+        echo "To stop it, run: ./stop mii"
+        exit 1
+    else
+        # Process died but PID file remains, clean it up
+        rm .mii.pid
+    fi
+fi
+
+# 5. Start the App in the background
+echo ">>> Starting miii background service..."
+nohup uvicorn main:app --host 0.0.0.0 --port 8000 > miii.log 2>&1 &
+PID=$!
+echo $PID > .mii.pid
+
+# 6. Success Output
+echo "====================================================="
+echo "🚴 miii is now RUNNING! 🚴"
+echo "Open Google Chrome on your phone and go to:"
+echo "http://localhost:8000"
+echo ""
+echo "To view live logs: tail -f miii.log"
+echo "To stop the app:   ./stop mii"
+echo "====================================================="
