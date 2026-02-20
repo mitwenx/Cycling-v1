@@ -2,12 +2,12 @@
 
 APP_NAME=$1
 
-if; then
+if test "$APP_NAME" != "mii"; then
     echo "Usage: ./stop mii"
     exit 1
 fi
 
-if; then
+if test ! -f ".mii.pid"; then
     echo "miii is not currently running (no .mii.pid file found)."
     exit 1
 fi
@@ -24,4 +24,4 @@ sleep 2
 # Clean up the PID file
 rm -f .mii.pid
 
-echo "miii has been stopped."
+echo "miii has been stopped safely."
