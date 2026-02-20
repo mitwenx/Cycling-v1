@@ -9,11 +9,11 @@ import { motion } from 'framer-motion';
 export default function RideDetail() {
     const { id } = useParams();
     const nav = useNavigate();
-    const = useState<any>(null);
+    const [data, setData] = useState<any>(null);
 
     useEffect(() => {
         getRide(Number(id)).then(setData);
-    },);
+    }, [id]);
 
     if (!data) return <div className="p-8 text-center text-gray-400">Loading...</div>;
 
@@ -27,15 +27,13 @@ export default function RideDetail() {
                 <h1 className="text-xl font-bold">{new Date(ride.start_time).toLocaleDateString()}</h1>
             </div>
 
-            {/* Map */}
             <div className="h-64 rounded-3xl overflow-hidden shadow-lg border border-gray-800">
-                <MapContainer bounds={path} zoomControl={false} style={{ height: '100%', width: '100%' }}>
+                <MapContainer center={path.length > 0 ? path[0] : [0,0]} zoom={13} zoomControl={false} style={{ height: '100%', width: '100%' }}>
                     <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
                     <Polyline positions={path} color="#a8c7fa" weight={4} />
                 </MapContainer>
             </div>
 
-            {/* Core Stats Grid */}
             <div className="grid grid-cols-2 gap-4">
                 <div className="bg-surface p-4 rounded-2xl flex flex-col gap-1">
                     <span className="text-gray-400 text-xs font-bold uppercase">Distance</span>
@@ -54,7 +52,6 @@ export default function RideDetail() {
                 <div className="bg-surface-container flex flex-col items-center p-3 rounded-2xl"><Clock size={18} className="text-gray-400 mb-1"/> <span className="font-bold text-sm">{Math.round(ride.moving_time_seconds / 60)}m</span></div>
             </div>
 
-            {/* Elevation Chart */}
             <div className="bg-surface p-4 rounded-3xl">
                 <h3 className="text-sm font-bold text-gray-400 uppercase mb-4">Elevation Profile</h3>
                 <div className="h-40">
@@ -74,7 +71,6 @@ export default function RideDetail() {
                 </div>
             </div>
             
-            {/* Achievements */}
             {achievements.length > 0 && (
                 <div className="bg-surface p-4 rounded-3xl mb-8">
                     <h3 className="text-sm font-bold text-yellow-500 uppercase mb-3">Best Efforts</h3>
@@ -88,4 +84,4 @@ export default function RideDetail() {
             )}
         </motion.div>
     );
-                          }
+}
