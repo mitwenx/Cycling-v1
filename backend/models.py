@@ -14,12 +14,10 @@ class Ride(SQLModel, table=True):
     avg_speed_kph: float = 0.0
     max_speed_kph: float = 0.0
     avg_power_watts: int = 0
-    # FIX: Added ["TrackPoint"] to List
     points: List["TrackPoint"] = Relationship(back_populates="ride", cascade_delete=True)
 
 class TrackPoint(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    # FIX: Added [int] to Optional
     ride_id: Optional[int] = Field(default=None, foreign_key="ride.id")
     timestamp: float
     latitude: float
@@ -27,7 +25,6 @@ class TrackPoint(SQLModel, table=True):
     altitude: float
     speed_ms: float
     power_watts: int = 0
-    # FIX: Added ["Ride"] to Optional
     ride: Optional["Ride"] = Relationship(back_populates="points")
 
 class BestEffort(SQLModel, table=True):
