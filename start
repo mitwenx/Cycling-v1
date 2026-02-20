@@ -10,7 +10,7 @@ fi
 echo ">>> Checking system dependencies..."
 
 # 1. Install System Packages if missing (First Time Setup)
-if ! command -v python3 &> /dev/null || ! command -v npm &> /dev/null || ! command -v termux-location &> /dev/null; then
+if ! command -v python &> /dev/null || ! command -v npm &> /dev/null || ! command -v termux-location &> /dev/null; then
     echo ">>> First time setup: Installing system packages (Python, Node.js, Termux-API)..."
     pkg update -y
     pkg install python nodejs termux-api -y
@@ -19,7 +19,7 @@ fi
 # 2. Setup Python Virtual Environment (First Time Setup)
 if; then
     echo ">>> First time setup: Creating Python virtual environment..."
-    python3 -m venv venv
+    python -m venv venv
     source venv/bin/activate
     echo ">>> Installing Python dependencies..."
     pip install -r requirements.txt
