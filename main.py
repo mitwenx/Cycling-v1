@@ -1,5 +1,6 @@
 import os
 import asyncio
+import mimetypes
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -13,8 +14,18 @@ from backend.gps_manager import GPSManager
 from backend.gpx_parser import import_gpx
 from backend.physics import calculate_calories
 
+# --- FIX 1: Explicitly set MIME types for Termux ---
+mimetypes.init()
+mimetypes.add_type('application/javascript', '.js')
+mimetypes.add_type('text/css', '.css')
+mimetypes.add_type('image/svg+xml', '.svg')
+
+# --- FIX 2: Use Absolute Paths ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
+DIST_DIR = os.path.join(BASE_DIR, "frontend/dist")
+ASSETS_DIR = os.path.join(DIST_DIR, "assets")
+
 os.makedirs(DATA_DIR, exist_ok=True)
 engine = create_engine(f"sqlite:///{DATA_DIR}/cycling.db")
 
@@ -28,8 +39,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-if os.path.exists("frontend/dist"):
-    app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
+# --- FIX 3: Robust Static File Mounting ---
+if os.path.exists(ASSETS_DIR):
+    app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
 
 @app.websocket("/ws/live")
 async def websocket_endpoint(websocket: WebSocket):
@@ -83,7 +95,6 @@ def get_ride(ride_id: int):
         points = session.exec(select(TrackPoint).where(TrackPoint.ride_id == ride_id).order_by(TrackPoint.timestamp)).all()
         efforts = session.exec(select(BestEffort).where(BestEffort.ride_id == ride_id)).all()
         
-        # Fixed list comprehension here
         path = [[p.latitude, p.longitude] for i, p in enumerate(points) if i % 3 == 0]
         
         return {"ride": ride, "path": path, "points": points, "achievements": efforts}
@@ -95,8 +106,11 @@ async def upload_gpx(file: UploadFile = File(...)):
         ride_id = import_gpx(content, session)
         return {"status": "success", "ride_id": ride_id}
 
+# --- FIX 4: Dedicated Catch-All + Root Handler ---
 @app.get("/{full_path:path}")
 def serve_react_app(full_path: str):
-    if os.path.exists("frontend/dist/index.html"):
-        return FileResponse("frontend/dist/index.html")
-    return {"error": "Frontend not built."}
+    # This checks for the built index.html regardless of where the script is run
+    index_path = os.path.join(DIST_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"error": "Frontend not built. Run 'npm run build' in frontend/ directory."}
