@@ -5,15 +5,15 @@ import { Calendar, ChevronRight, Activity, Zap, Mountain } from 'lucide-react';
 import { getHistory } from '../api';
 
 export default function History() {
-    const = useState<any[]>([]);
-    const = useState(true);
+    const [rides, setRides] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const nav = useNavigate();
 
     useEffect(() => {
         getHistory()
             .then(setRides)
             .finally(() => setLoading(false));
-    },[]);
+    }, []);
 
     const formatDuration = (seconds: number) => {
         const h = Math.floor(seconds / 3600);
@@ -44,7 +44,7 @@ export default function History() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.05 }}
                             onClick={() => nav(`/ride/${ride.id}`)}
-                            className="bg-surface p-4 rounded-3xl shadow-lg border border-gray-800/50 cursor-pointer active:scale- transition-transform"
+                            className="bg-surface p-4 rounded-3xl shadow-lg border border-gray-800/50 cursor-pointer active:scale-95 transition-transform"
                         >
                             <div className="flex justify-between items-start mb-3">
                                 <div>
