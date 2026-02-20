@@ -41,12 +41,11 @@ class GPSManager:
 
     def _poll_gps(self, provider="gps"):
         try:
-            # FIX: Added the actual command arguments here
             cmd = [self.termux_bin, "-p", provider, "-r", "1"]
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             if res.returncode == 0:
                 return json.loads(res.stdout)
-        except Exception as e:
+        except Exception:
             pass
         return None
 
@@ -61,7 +60,6 @@ class GPSManager:
                 data = await loop.run_in_executor(self._executor, self._poll_gps, "network")
 
             if data and "latitude" in data:
-                # FIX: Correctly extract lat/lon from the dictionary
                 lat = data['latitude']
                 lon = data['longitude']
                 speed_ms = data.get('speed', 0)
@@ -69,10 +67,13 @@ class GPSManager:
                 bearing = data.get('bearing', 0)
                 
                 self.altitude_buffer.append(raw_alt)
-                smooth_alt = sum(self.altitude_buffer) / len(self.altitude_buffer)
+                if self.altitude_buffer:
+                    smooth_alt = sum(self.altitude_buffer) / len(self.altitude_buffer)
+                else:
+                    smooth_alt = raw_alt
+                
                 ts = time.time()
                 
-                # Default Stats
                 stats = {
                     "lat": lat, 
                     "lon": lon, 
@@ -86,11 +87,9 @@ class GPSManager:
                     "paused": self.is_paused
                 }
 
-                # 2. Recording Logic
                 if self.is_recording and not self.is_paused:
                     dt = min(ts - self.last_valid_point['ts'], 2.0) if self.last_valid_point else 0
                     
-                    # FIX: Correctly access dictionary keys for distance calc
                     dist_delta = 0
                     if self.last_valid_point:
                         dist_delta = haversine_distance(
@@ -101,19 +100,17 @@ class GPSManager:
                     is_moving = (speed_ms * 3.6) > 3.0
                     grade, elev_delta = 0.0, 0.0
 
-                    # Grade (Slope) Calculation
                     if self.last_grade_checkpoint:
                         g_dist = haversine_distance(
                             self.last_grade_checkpoint['lat'], self.last_grade_checkpoint['lon'], 
                             lat, lon
                         )
-                        if g_dist > 0.02: # Calc grade every 20 meters
+                        if g_dist > 0.02:
                             grade = (smooth_alt - self.last_grade_checkpoint['alt']) / (g_dist * 1000)
                             self.last_grade_checkpoint = {'lat': lat, 'lon': lon, 'alt': smooth_alt}
                     else:
                         self.last_grade_checkpoint = {'lat': lat, 'lon': lon, 'alt': smooth_alt}
 
-                    # Elevation Gain Calculation
                     if self.last_elev_checkpoint is None: 
                         self.last_elev_checkpoint = smooth_alt
                     elif (smooth_alt - self.last_elev_checkpoint) > 1.5:
@@ -142,7 +139,6 @@ class GPSManager:
                                 ride.elevation_gain += elev_delta
                                 ride.max_speed_kph = max(ride.max_speed_kph, speed_ms * 3.6)
                                 
-                                # Rolling average for power
                                 if ride.avg_power_watts > 0:
                                     ride.avg_power_watts = int((ride.avg_power_watts * 0.95) + (watts * 0.05))
                                 else:
@@ -150,7 +146,6 @@ class GPSManager:
                                     
                                 session.add(ride)
                                 session.commit()
-                                session.refresh(ride)
                                 
                                 stats.update({
                                     "dist_km": ride.total_distance_km,
@@ -160,11 +155,8 @@ class GPSManager:
                         
                         self.point_buffer.append(tp)
                         self.last_valid_point = {'lat': lat, 'lon': lon, 'alt': smooth_alt, 'ts': ts}
-                        
-                        if len(self.point_buffer) >= 5: 
-                            self.flush_buffer()
+                        if len(self.point_buffer) >= 5: self.flush_buffer()
                     else:
-                        # FIX: Update status string instead of overwriting the whole dict
                         stats["status"] = "Auto-Pause"
                         stats["power"] = 0
                 
@@ -185,4 +177,4 @@ class GPSManager:
             self.point_buffer = []
         except Exception as e:
             print(f"Error flushing buffer: {e}")
-            self.point_buffer = [] # Clear anyway to prevent memory leaks
+            self.point_buffer = []
