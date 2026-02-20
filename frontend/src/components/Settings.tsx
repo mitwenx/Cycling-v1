@@ -3,13 +3,13 @@ import { Upload, FileDown, Settings as Icon } from 'lucide-react';
 import { uploadGPX } from '../api';
 
 export default function Settings() {
-    const = useState(false);
+    const [uploading, setUploading] = useState(false);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.length) return;
         setUploading(true);
         try {
-            await uploadGPX(e.target.files);
+            await uploadGPX(e.target.files[0]);
             alert("GPX imported successfully!");
         } catch (err) {
             alert("Failed to import GPX.");
