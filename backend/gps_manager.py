@@ -41,11 +41,14 @@ class GPSManager:
 
     def _poll_gps(self, provider="gps"):
         try:
-            cmd = [self.termux_bin, "-p", provider, "-r", "1"]
+            # FIXED: Changed "-r" "1" to "-r" "last". "last" gets the fastest cached location.
+            cmd = [self.termux_bin, "-p", provider, "-r", "last"]
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-            if res.returncode == 0:
+            
+            # Only parse if the command succeeded and returned text
+            if res.returncode == 0 and res.stdout.strip():
                 return json.loads(res.stdout)
-        except Exception:
+        except Exception as e:
             pass
         return None
 
@@ -54,7 +57,10 @@ class GPSManager:
         while True:
             t_start = time.time()
             
+            # 1. Try GPS Provider
             data = await loop.run_in_executor(self._executor, self._poll_gps, "gps")
+            
+            # 2. If GPS fails or is still searching, Fallback to Network Provider
             if not data or "API_ERROR" in data:
                 data = await loop.run_in_executor(self._executor, self._poll_gps, "network")
 
@@ -168,7 +174,15 @@ class GPSManager:
                     self.last_valid_point = {'lat': lat, 'lon': lon, 'alt': smooth_alt, 'ts': ts}
                 
                 await self.broadcast(stats)
+            else:
+                # If both GPS and Network fail
+                await self.broadcast({
+                    "lat": 0, "lon": 0, "speed_kph": 0, "power": 0, 
+                    "dist_km": 0, "time": 0, "avg_speed_kph": 0, "bearing": 0,
+                    "status": "Searching Signal...", "recording": self.is_recording, "paused": self.is_paused
+                })
 
+            # Ensure we don't overwhelm Termux API, ping every 1 second
             elapsed = time.time() - t_start
             await asyncio.sleep(max(1.0 - elapsed, 0.1))
 
