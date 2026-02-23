@@ -54,7 +54,6 @@ class GPSManager:
         while True:
             t_start = time.time()
             
-            # 1. Get GPS Data (Try GPS first, fall back to Network)
             data = await loop.run_in_executor(self._executor, self._poll_gps, "gps")
             if not data or "API_ERROR" in data:
                 data = await loop.run_in_executor(self._executor, self._poll_gps, "network")
@@ -82,6 +81,7 @@ class GPSManager:
                     "dist_km": 0, 
                     "power": 0, 
                     "time": 0, 
+                    "avg_speed_kph": 0,
                     "status": "Connected",
                     "recording": self.is_recording, 
                     "paused": self.is_paused
@@ -89,12 +89,10 @@ class GPSManager:
 
                 if self.is_recording and not self.is_paused:
                     dt = min(ts - self.last_valid_point['ts'], 2.0) if self.last_valid_point else 0
-                    
                     dist_delta = 0
                     if self.last_valid_point:
                         dist_delta = haversine_distance(
-                            self.last_valid_point['lat'], self.last_valid_point['lon'], 
-                            lat, lon
+                            self.last_valid_point['lat'], self.last_valid_point['lon'], lat, lon
                         )
                     
                     is_moving = (speed_ms * 3.6) > 3.0
@@ -102,8 +100,7 @@ class GPSManager:
 
                     if self.last_grade_checkpoint:
                         g_dist = haversine_distance(
-                            self.last_grade_checkpoint['lat'], self.last_grade_checkpoint['lon'], 
-                            lat, lon
+                            self.last_grade_checkpoint['lat'], self.last_grade_checkpoint['lon'], lat, lon
                         )
                         if g_dist > 0.02:
                             grade = (smooth_alt - self.last_grade_checkpoint['alt']) / (g_dist * 1000)
@@ -122,13 +119,8 @@ class GPSManager:
                         watts = calculate_power(speed_ms, grade)
                         
                         tp = TrackPoint(
-                            ride_id=self.current_ride_id, 
-                            timestamp=ts, 
-                            latitude=lat, 
-                            longitude=lon, 
-                            altitude=smooth_alt, 
-                            speed_ms=speed_ms, 
-                            power_watts=watts
+                            ride_id=self.current_ride_id, timestamp=ts, latitude=lat, longitude=lon, 
+                            altitude=smooth_alt, speed_ms=speed_ms, power_watts=watts
                         )
                         
                         with Session(self.engine) as session:
@@ -147,10 +139,12 @@ class GPSManager:
                                 session.add(ride)
                                 session.commit()
                                 
+                                avg_spd = (ride.total_distance_km / (ride.moving_time_seconds / 3600)) if ride.moving_time_seconds > 0 else 0
                                 stats.update({
                                     "dist_km": ride.total_distance_km,
                                     "power": watts, 
-                                    "time": ride.moving_time_seconds
+                                    "time": ride.moving_time_seconds,
+                                    "avg_speed_kph": avg_spd
                                 })
                         
                         self.point_buffer.append(tp)
@@ -159,6 +153,16 @@ class GPSManager:
                     else:
                         stats["status"] = "Auto-Pause"
                         stats["power"] = 0
+                        stats["speed_kph"] = 0
+                        with Session(self.engine) as session:
+                            ride = session.get(Ride, self.current_ride_id)
+                            if ride:
+                                avg_spd = (ride.total_distance_km / (ride.moving_time_seconds / 3600)) if ride.moving_time_seconds > 0 else 0
+                                stats.update({
+                                    "dist_km": ride.total_distance_km,
+                                    "time": ride.moving_time_seconds,
+                                    "avg_speed_kph": avg_spd
+                                })
                 
                 if not self.is_recording:
                     self.last_valid_point = {'lat': lat, 'lon': lon, 'alt': smooth_alt, 'ts': ts}
