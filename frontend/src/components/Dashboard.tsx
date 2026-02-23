@@ -1,16 +1,16 @@
+
 import { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Play, Pause, Square, Navigation } from 'lucide-react';
+import { Play, Pause, Square, Navigation, Crosshair } from 'lucide-react';
 import { startRide, pauseRide, resumeRide, stopRide } from '../api';
 
 const customIcon = L.divIcon({
-    html: `<div class="w-4 h-4 bg-primary border-2 border-white rounded-full shadow-"></div>`,
+    html: `<div class="w-5 h-5 bg-[#4285F4] border-[3px] border-white rounded-full shadow-md animate-pulse"></div>`,
     className: ''
 });
 
-// Map Updater Component
 const MapUpdater = ({ center, bearing, compassMode }: any) => {
     const map = useMap();
     useEffect(() => {
@@ -29,7 +29,7 @@ const MapUpdater = ({ center, bearing, compassMode }: any) => {
 };
 
 export default function Dashboard() {
-    const [stats, setStats] = useState({ lat: 0, lon: 0, speed_kph: 0, power: 0, dist_km: 0, time: 0, bearing: 0, status: 'Init', recording: false, paused: false });
+    const [stats, setStats] = useState({ lat: 0, lon: 0, speed_kph: 0, power: 0, dist_km: 0, time: 0, avg_speed_kph: 0, bearing: 0, status: 'Init', recording: false, paused: false });
     const [path, setPath] = useState<any[]>([]);
     const [compassMode, setCompassMode] = useState(false);
     const ws = useRef<WebSocket | null>(null);
@@ -57,65 +57,84 @@ export default function Dashboard() {
     };
 
     return (
-        <div className="relative h-screen overflow-hidden flex flex-col">
-            <div className="flex-1 relative bg-gray-900 rounded-b-3xl overflow-hidden shadow-xl z-0">
-                <MapContainer center={[0,0]} zoom={15} zoomControl={false} style={{ height: '100%', width: '100%', position: 'absolute' }}>
-                    <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
-                    <Polyline positions={path} color="#a8c7fa" weight={5} />
-                    {stats.lat !== 0 && <Marker position={[stats.lat, stats.lon]} icon={customIcon} />}
-                    <MapUpdater center={[stats.lat, stats.lon]} bearing={stats.bearing} compassMode={compassMode} />
-                </MapContainer>
+        <div className="relative h-screen flex flex-col bg-[#111318] text-[#e2e2e6] overflow-hidden">
+            <header className="flex justify-between items-center px-6 py-4 border-b border-[#222] bg-[#111318] z-50">
+                <span className="text-xl font-medium">miii</span>
+                <div className="flex items-center gap-2 px-3 py-1 bg-[#2A2D35] rounded-full text-[10px] uppercase font-medium tracking-wide">
+                    <div className={`w-1.5 h-1.5 rounded-full ${stats.recording && !stats.paused ? 'bg-green-500 shadow-[0_0_5px_#4caf50]' : stats.paused ? 'bg-yellow-400' : 'bg-gray-500'}`}></div>
+                    <span className={stats.recording && !stats.paused ? 'text-[#a5f5a8]' : stats.paused ? 'text-[#ffe082]' : ''}>{stats.status}</span>
+                </div>
+            </header>
 
-                <button onClick={() => setCompassMode(!compassMode)} className={`absolute top-4 right-4 z-20 p-3 rounded-full shadow-lg ${compassMode ? 'bg-primary text-on-primary' : 'bg-surface text-gray-200'}`}>
-                    <Navigation size={20} className={compassMode ? '' : 'rotate-45'} />
-                </button>
-            </div>
+            <main className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto pb-24">
+                <div className="relative h-[40vh] min-h-[300px] rounded-3xl overflow-hidden border border-[#333] z-10 flex-shrink-0">
+                    <MapContainer center={stats.lat !== 0 ? [stats.lat, stats.lon] : [0,0]} zoom={15} zoomControl={false} style={{ height: '100%', width: '100%', background: '#eee' }}>
+                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
+                        <Polyline positions={path} color="#a8c7fa" weight={5} />
+                        {stats.lat !== 0 && <Marker position={[stats.lat, stats.lon]} icon={customIcon} />}
+                        <MapUpdater center={[stats.lat, stats.lon]} bearing={stats.bearing} compassMode={compassMode} />
+                    </MapContainer>
 
-            <div className="absolute bottom-6 left-4 right-4 z-10 flex flex-col gap-4">
-                <div className="bg-surface-container/95 backdrop-blur-md p-5 rounded-3xl shadow-2xl border border-gray-700">
-                    <div className="flex justify-between items-center mb-4">
-                        <span className="text-xs uppercase tracking-wider text-gray-400 font-semibold">{stats.status}</span>
-                        <span className="text-4xl font-black tracking-tighter text-white">{stats.speed_kph.toFixed(1)} <span className="text-lg text-gray-400 font-medium">km/h</span></span>
+                    <button onClick={() => setCompassMode(!compassMode)} className={`absolute top-4 right-4 z-[900] w-10 h-10 flex items-center justify-center rounded-full shadow-lg border border-[#444] transition-colors ${compassMode ? 'bg-[#222] text-[#a8c7fa] border-[#a8c7fa]' : 'bg-[#1e2128]/95 text-white'}`}>
+                        <Navigation size={18} className={`transition-transform duration-300 ${compassMode ? '' : 'rotate-45'}`} />
+                    </button>
+                    <button className="absolute top-16 right-4 z-[900] w-10 h-10 flex items-center justify-center rounded-full shadow-lg border border-[#444] bg-[#1e2128]/95 text-white">
+                        <Crosshair size={18} />
+                    </button>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                    <div className="bg-[#2A2D35] rounded-2xl p-5 flex flex-col items-center justify-center shadow-md">
+                        <span className="text-[11px] text-[#c4c6cf] uppercase tracking-wider font-bold">Speed</span>
+                        <div className="mt-1"><span className="text-[42px] font-black text-[#a8c7fa] leading-none">{stats.speed_kph.toFixed(1)}</span> <span className="text-sm text-[#c4c6cf]">km/h</span></div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="flex flex-col">
-                            <span className="text-xs text-gray-400 uppercase font-bold">Power</span>
-                            <span className="text-xl font-bold text-primary">{stats.power} W</span>
+                    
+                    <div className="flex gap-3">
+                        <div className="flex-1 bg-[#1E2128] rounded-2xl p-4 flex flex-col items-center justify-center shadow-md">
+                            <span className="text-[11px] text-[#c4c6cf] uppercase tracking-wider font-bold">Power</span>
+                            <div className="mt-1"><span className="text-2xl font-bold">{stats.power}</span> <span className="text-sm text-[#c4c6cf]">W</span></div>
                         </div>
-                        <div className="flex flex-col">
-                            <span className="text-xs text-gray-400 uppercase font-bold">Distance</span>
-                            <span className="text-xl font-bold">{stats.dist_km.toFixed(2)} km</span>
+                        <div className="flex-1 bg-[#1E2128] rounded-2xl p-4 flex flex-col items-center justify-center shadow-md">
+                            <span className="text-[11px] text-[#c4c6cf] uppercase tracking-wider font-bold">Time</span>
+                            <div className="mt-1"><span className="text-2xl font-bold">{formatTime(stats.time)}</span></div>
                         </div>
-                        <div className="flex flex-col">
-                            <span className="text-xs text-gray-400 uppercase font-bold">Time</span>
-                            <span className="text-xl font-bold">{formatTime(stats.time)}</span>
+                    </div>
+
+                    <div className="flex gap-3">
+                        <div className="flex-1 bg-[#1E2128] rounded-2xl p-4 flex flex-col items-center justify-center shadow-md">
+                            <span className="text-[11px] text-[#c4c6cf] uppercase tracking-wider font-bold">Distance</span>
+                            <div className="mt-1"><span className="text-2xl font-bold">{stats.dist_km.toFixed(2)}</span> <span className="text-sm text-[#c4c6cf]">km</span></div>
+                        </div>
+                        <div className="flex-1 bg-[#1E2128] rounded-2xl p-4 flex flex-col items-center justify-center shadow-md">
+                            <span className="text-[11px] text-[#c4c6cf] uppercase tracking-wider font-bold">Avg Speed</span>
+                            <div className="mt-1"><span className="text-2xl font-bold">{stats.avg_speed_kph.toFixed(1)}</span> <span className="text-sm text-[#c4c6cf]">km/h</span></div>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex gap-4">
+                <div className="flex gap-3 mt-2">
                     {!stats.recording ? (
-                        <button onClick={startRide} className="flex-1 bg-primary text-on-primary py-4 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
+                        <button onClick={startRide} className="flex-1 h-[56px] bg-[#a8c7fa] text-[#003062] rounded-2xl font-bold text-base flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg">
                             <Play fill="currentColor" size={20} /> START
                         </button>
                     ) : (
                         <>
                             {stats.paused ? (
-                                <button onClick={resumeRide} className="flex-1 bg-primary text-on-primary py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform">
+                                <button onClick={resumeRide} className="flex-1 h-[56px] bg-[#a8c7fa] text-[#003062] rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg">
                                     <Play fill="currentColor" size={20} /> RESUME
                                 </button>
                             ) : (
-                                <button onClick={pauseRide} className="flex-1 bg-secondary text-on-secondary py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform">
+                                <button onClick={pauseRide} className="flex-1 h-[56px] bg-[#cce8e9] text-[#051f23] rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg">
                                     <Pause fill="currentColor" size={20} /> PAUSE
                                 </button>
                             )}
-                            <button onClick={() => { stopRide(); setPath([]); }} className="flex-1 bg-error/20 text-error py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform border border-error/30">
+                            <button onClick={() => { stopRide(); setPath([]); }} className="flex-1 h-[56px] bg-[#93000a] text-[#ffb4ab] rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg">
                                 <Square fill="currentColor" size={20} /> STOP
                             </button>
                         </>
                     )}
                 </div>
-            </div>
+            </main>
         </div>
     );
 }
