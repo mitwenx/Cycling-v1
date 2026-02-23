@@ -6,7 +6,7 @@ import { ArrowLeft, Undo2, Save, Route as RouteIcon } from 'lucide-react';
 import { saveRoute } from '../api';
 
 const waypointIcon = L.divIcon({
-    html: `<div class="w-4 h-4 bg-white border-4 border-primary rounded-full shadow-md"></div>`,
+    html: `<div class="w-4 h-4 bg-white border-4 border-[#a8c7fa] rounded-full shadow-md"></div>`,
     className: ''
 });
 
@@ -108,7 +108,7 @@ export default function Planner() {
                 points: snappedPath
             });
             alert("Route saved!");
-            nav('/settings');
+            nav(-1);
         } catch (e) {
             alert("Failed to save route.");
         } finally {
@@ -117,42 +117,42 @@ export default function Planner() {
     };
 
     return (
-        <div className="h-screen flex flex-col bg-background">
-            <div className="p-4 flex justify-between items-center bg-background z-10 relative">
-                <button onClick={() => nav(-1)} className="p-2 bg-surface rounded-full text-white">
+        <div className="h-screen flex flex-col bg-[#111318] text-[#e2e2e6]">
+            <div className="p-4 flex justify-between items-center bg-[#111318] z-10 relative">
+                <button onClick={() => nav(-1)} className="p-2 bg-[#1E2128] rounded-full text-white active:bg-[#2A2D35]">
                     <ArrowLeft size={20} />
                 </button>
                 <div className="font-bold flex items-center gap-2">
-                    <RouteIcon size={20} className="text-primary" /> Route Planner
+                    <RouteIcon size={20} className="text-[#a8c7fa]" /> Route Planner
                 </div>
-                <button onClick={handleSave} className="p-2 bg-primary text-on-primary rounded-full font-bold">
+                <button onClick={handleSave} className="p-2 bg-[#a8c7fa] text-[#003062] rounded-full font-bold active:bg-[#cce8e9]">
                     <Save size={20} />
                 </button>
             </div>
 
-            <div className="px-4 pb-4 bg-background z-10 relative">
-                <div className="bg-surface p-4 rounded-3xl flex justify-around shadow-lg">
+            <div className="px-4 pb-4 bg-[#111318] z-10 relative">
+                <div className="bg-[#1E2128] p-4 rounded-3xl flex justify-around shadow-lg">
                     <div className="text-center">
-                        <div className="text-xs text-gray-400 font-bold uppercase">Distance</div>
-                        <div className="text-xl font-black text-white">{stats.distance.toFixed(1)} <span className="text-sm font-medium">km</span></div>
+                        <div className="text-[11px] text-[#c4c6cf] font-bold uppercase tracking-wider">Distance</div>
+                        <div className="text-xl font-black text-[#e2e2e6]">{stats.distance.toFixed(1)} <span className="text-sm font-medium">km</span></div>
                     </div>
-                    <div className="w-px bg-gray-700"></div>
+                    <div className="w-px bg-[#333]"></div>
                     <div className="text-center">
-                        <div className="text-xs text-gray-400 font-bold uppercase">Elevation</div>
-                        <div className="text-xl font-black text-white">{stats.elevation} <span className="text-sm font-medium">m</span></div>
+                        <div className="text-[11px] text-[#c4c6cf] font-bold uppercase tracking-wider">Elevation</div>
+                        <div className="text-xl font-black text-[#e2e2e6]">{stats.elevation} <span className="text-sm font-medium">m</span></div>
                     </div>
                 </div>
             </div>
 
-            <div className="flex-1 relative z-0 pb-20 rounded-t-3xl overflow-hidden border-t border-gray-800">
+            <div className="flex-1 relative z-0 pb-[80px] rounded-t-3xl overflow-hidden border-t border-[#333]">
                 {loading && (
-                    <div className="absolute inset-0 bg-black/40 z-20 flex items-center justify-center backdrop-blur-sm">
-                        <div className="bg-surface px-6 py-3 rounded-2xl font-bold animate-pulse">Calculating Route...</div>
+                    <div className="absolute inset-0 bg-black/50 z-[2000] flex items-center justify-center backdrop-blur-sm">
+                        <div className="bg-[#1E2128] text-[#a8c7fa] px-6 py-3 rounded-2xl font-bold animate-pulse">Calculating Route...</div>
                     </div>
                 )}
                 
-                <MapContainer center={[0,0]} zoom={2} zoomControl={false} style={{ height: '100%', width: '100%' }}>
-                    <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                <MapContainer center={[0,0]} zoom={2} zoomControl={false} style={{ height: '100%', width: '100%', background: '#eee' }}>
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
                     <ClickHandler onMapClick={handleMapClick} />
                     
                     {waypoints.map((pos, idx) => (
@@ -165,13 +165,13 @@ export default function Planner() {
                 <button 
                     onClick={undoLast}
                     disabled={waypoints.length === 0}
-                    className="absolute bottom-28 right-4 z-10 p-4 bg-surface text-white rounded-full shadow-lg border border-gray-700 disabled:opacity-50 active:scale-95"
+                    className="absolute bottom-24 right-4 z-[900] w-12 h-12 flex justify-center items-center bg-[#1E2128] text-white rounded-full shadow-lg border border-[#444] disabled:opacity-50 active:scale-95"
                 >
-                    <Undo2 size={24} />
+                    <Undo2 size={20} />
                 </button>
                 
-                <div className="absolute top-4 left-0 right-0 text-center z-10 pointer-events-none">
-                    <span className="bg-black/60 text-white text-xs px-4 py-2 rounded-full backdrop-blur-md">
+                <div className="absolute top-4 left-0 right-0 text-center z-[900] pointer-events-none">
+                    <span className="bg-[#1e2128]/90 text-white text-xs px-4 py-2 rounded-full border border-[#444] shadow-md backdrop-blur-md">
                         Tap map to add waypoints
                     </span>
                 </div>
